@@ -3,12 +3,18 @@ package main
 import (
 	"fmt"
 	"log"
+	"encoding/json"
 	"net/http"
 	"golang.org/x/net/websocket"
 )
 
+type DATA struct {
+	Key string
+	Value string
+}
+
 var clients = make(map[*websocket.Conn]bool)
-var broadcast = make(chan string)
+var broadcast = make(chan DATA)
 
 func handleHello(w http.ResponseWriter, r *http.Request) {
 	hello := []byte("hello world")
@@ -22,15 +28,11 @@ func handleHello(w http.ResponseWriter, r *http.Request) {
 func handleConnection(ws *websocket.Conn) {
 	defer ws.Close()
 
-	err := websocket.Message.Send(ws, "hello.")
-	if err != nil {
-		log.Print(err)
-	}
-
 	clients[ws] = true
 
 	// メッセージの受信
 	for {
+		var data DATA
 		msg := ""
 
 		err := websocket.Message.Receive(ws, &msg)
@@ -38,8 +40,13 @@ func handleConnection(ws *websocket.Conn) {
 			log.Print(err)
 		}
 
+		jsonerr := json.Unmarshal([]byte(msg), &data)
+		if jsonerr != nil {
+			log.Print(err)
+		}
+
 		// 受取ったメッセージをbroadcastチャネルに送る(awaitのような感じ)
-		broadcast <- msg
+		broadcast <- data
 	}
 }
 
@@ -50,7 +57,7 @@ func handleMessage() {
 
 		// 各クライアントへのメッセージの送信
 		for client := range clients {
-			err := websocket.Message.Send(client, fmt.Sprintf("received message : %s", msg))
+			err := websocket.Message.Send(client, fmt.Sprintf("key: %s, value: %s", msg.Key, msg.Value))
 			if err != nil {
 				log.Print(err)
 			}
