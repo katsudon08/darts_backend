@@ -8,11 +8,6 @@ import (
 	"golang.org/x/net/websocket"
 )
 
-type DATA struct {
-	Key string
-	Value string
-}
-
 var clients = make(map[*websocket.Conn]bool)
 var broadcast = make(chan DATA)
 
@@ -53,11 +48,11 @@ func handleConnection(ws *websocket.Conn) {
 func handleMessage() {
 	for {
 		// broadcastからメッセージを受取る
-		msg := <- broadcast
+		data := <- broadcast
 
 		// 各クライアントへのメッセージの送信
 		for client := range clients {
-			err := websocket.Message.Send(client, fmt.Sprintf("key: %s, value: %s", msg.Key, msg.Value))
+			err := websocket.Message.Send(client, fmt.Sprintf("key: %s, value: %s", data.Key, data.Value))
 			if err != nil {
 				log.Print(err)
 			}
