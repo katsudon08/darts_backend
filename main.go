@@ -58,7 +58,7 @@ func handleMessage() {
 
 		// 各クライアントへのメッセージの送信
 		for client := range clients {
-			err := websocket.Message.Send(client, fmt.Sprintf("{Key: %s, Detail: %s, Value: %s}", data.Key, data.Detail, data.Value))
+			err := websocket.Message.Send(client, fmt.Sprintf("{\"Key\": \"%s\", \"Detail\": \"%s\", \"Value\": \"%s\"}", data.Key, data.Detail, data.Value))
 			if err != nil {
 				log.Print(err)
 			}
