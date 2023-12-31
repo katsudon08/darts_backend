@@ -52,9 +52,13 @@ func handleMessage() {
 		// broadcastからメッセージを受取る
 		data := <- broadcast
 
+		if data.Key == "" && data.Detail == "" && data.Value == "" {
+			continue
+		}
+
 		// 各クライアントへのメッセージの送信
 		for client := range clients {
-			err := websocket.Message.Send(client, fmt.Sprintf("key: %s, detail: %s, value: %s", data.Key, data.Detail, data.Value))
+			err := websocket.Message.Send(client, fmt.Sprintf("{Key: %s, Detail: %s, Value: %s}", data.Key, data.Detail, data.Value))
 			if err != nil {
 				log.Print(err)
 			}
