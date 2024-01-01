@@ -2,6 +2,6 @@ package main
 
 type DATA struct {
 	Key string
-	Detail string
+	User string
 	Value string
 }

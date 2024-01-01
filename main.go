@@ -35,6 +35,10 @@ func handleConnection(ws *websocket.Conn) {
 			log.Print(err)
 		}
 
+		if msg == "" {
+			continue
+		}
+
 		err = json.Unmarshal([]byte(msg), &data)
 		if err != nil {
 			log.Print(err)
@@ -52,13 +56,13 @@ func handleMessage() {
 		// broadcastからメッセージを受取る
 		data := <- broadcast
 
-		if data.Key == "" && data.Detail == "" && data.Value == "" {
+		if data.Key == "" && data.User == "" && data.Value == "" {
 			continue
 		}
 
 		// 各クライアントへのメッセージの送信
 		for client := range clients {
-			err := websocket.Message.Send(client, fmt.Sprintf("{\"Key\": \"%s\", \"Detail\": \"%s\", \"Value\": \"%s\"}", data.Key, data.Detail, data.Value))
+			err := websocket.Message.Send(client, fmt.Sprintf("{\"Key\": \"%s\", \"User\": \"%s\", \"Value\": \"%s\"}", data.Key, data.User, data.Value))
 			if err != nil {
 				log.Print(err)
 			}
