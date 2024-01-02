@@ -3,13 +3,12 @@ package main
 import (
 	"fmt"
 	"log"
-	"encoding/json"
 	"net/http"
 	"golang.org/x/net/websocket"
 )
 
 var clients = make(map[*websocket.Conn]bool)
-var broadcast = make(chan DATA)
+var broadcast = make(chan string)
 
 func handleHello(w http.ResponseWriter, r *http.Request) {
 	hello := []byte("hello world")
@@ -27,7 +26,6 @@ func handleConnection(ws *websocket.Conn) {
 
 	// メッセージの受信
 	for {
-		var data DATA
 		msg := ""
 
 		err := websocket.Message.Receive(ws, &msg)
@@ -35,34 +33,21 @@ func handleConnection(ws *websocket.Conn) {
 			log.Print(err)
 		}
 
-		if msg == "" {
-			continue
-		}
-
-		err = json.Unmarshal([]byte(msg), &data)
-		if err != nil {
-			log.Print(err)
-		}
-
-		fmt.Println(data)
+		fmt.Println(msg)
 
 		// 受取ったメッセージをbroadcastチャネルに送る(awaitのような感じ)
-		broadcast <- data
+		broadcast <- msg
 	}
 }
 
 func handleMessage() {
 	for {
 		// broadcastからメッセージを受取る
-		data := <- broadcast
-
-		if data.Key == "" && data.User == "" && data.Value == "" {
-			continue
-		}
+		msg := <- broadcast
 
 		// 各クライアントへのメッセージの送信
 		for client := range clients {
-			err := websocket.Message.Send(client, fmt.Sprintf("{\"Key\": \"%s\", \"User\": \"%s\", \"Value\": \"%s\"}", data.Key, data.User, data.Value))
+			err := websocket.Message.Send(client, msg)
 			if err != nil {
 				log.Print(err)
 			}
@@ -72,7 +57,8 @@ func handleMessage() {
 
 func main() {
 	http.HandleFunc("/", handleHello)
-	http.Handle("/ws", websocket.Handler(handleConnection))
+	http.Handle(fmt.Sprintf("/%s", GROUP), websocket.Handler(handleConnection))
+	http.Handle(fmt.Sprintf("/%s", TURN), websocket.Handler(handleConnection))
 	go handleMessage()
 
 	fmt.Println("serving at http://localhost:8080....")

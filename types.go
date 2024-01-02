@@ -1,7 +1,6 @@
 package main
 
-type DATA struct {
-	Key string
-	User string
-	Value string
-}
+const (
+	GROUP = "group"
+	TURN = "turn"
+)
