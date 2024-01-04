@@ -33,6 +33,8 @@ func handleConnection(ws *websocket.Conn) {
 	key := ws.Request().URL.String()[1:]
 	clients[key][ws] = true
 
+	fmt.Println("clients: ", clients[key])
+
 	// メッセージの受信
 	for {
 		msg := ""
@@ -40,7 +42,8 @@ func handleConnection(ws *websocket.Conn) {
 		err := websocket.Message.Receive(ws, &msg)
 		if err != nil {
 			if err.Error() == "EOF" {
-				log.Fatal(fmt.Errorf("read %s", err))
+				delete(clients[key], ws)
+				break
 			}
 			log.Print(err)
 		}
@@ -61,7 +64,7 @@ func handleMessage() {
 		// broadcastからメッセージを受取る
 		data := <- broadcast
 
-		fmt.Println(clients[data.Key])
+		fmt.Println("msg/clients: ", clients[data.Key])
 
 		// 各クライアントへのメッセージの送信
 		for client := range clients[data.Key] {
