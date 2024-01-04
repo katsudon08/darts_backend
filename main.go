@@ -13,6 +13,11 @@ type Handler func (*websocket.Conn, string)
 var clients = make(map[string]map[*websocket.Conn]bool)
 var broadcast = make(chan Data)
 
+func initClients() {
+	clients[GROUP] = make(map[*websocket.Conn]bool)
+	clients[TURN] = make(map[*websocket.Conn]bool)
+}
+
 func handleHello(w http.ResponseWriter, r *http.Request) {
 	hello := []byte("hello world")
 	_, err := w.Write(hello)
@@ -26,10 +31,7 @@ func handleConnection(ws *websocket.Conn) {
 	defer ws.Close()
 
 	key := ws.Request().URL.String()[1:]
-	clients[key] = make(map[*websocket.Conn]bool)
 	clients[key][ws] = true
-
-	fmt.Println(clients)
 
 	// メッセージの受信
 	for {
@@ -59,6 +61,8 @@ func handleMessage() {
 		// broadcastからメッセージを受取る
 		data := <- broadcast
 
+		fmt.Println(clients[data.Key])
+
 		// 各クライアントへのメッセージの送信
 		for client := range clients[data.Key] {
 			err := websocket.Message.Send(client, data.Msg)
@@ -70,6 +74,7 @@ func handleMessage() {
 }
 
 func main() {
+	initClients()
 	http.HandleFunc("/", handleHello)
 	http.Handle(fmt.Sprintf("/%s", GROUP), websocket.Handler(handleConnection))
 	http.Handle(fmt.Sprintf("/%s", TURN), websocket.Handler(handleConnection))
