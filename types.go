@@ -8,4 +8,5 @@ type Data struct {
 const (
 	GROUP = "group"
 	TURN = "turn"
+	USERS = "users"
 )

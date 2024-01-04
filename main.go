@@ -16,6 +16,7 @@ var broadcast = make(chan Data)
 func initClients() {
 	clients[GROUP] = make(map[*websocket.Conn]bool)
 	clients[TURN] = make(map[*websocket.Conn]bool)
+	clients[USERS] = make(map[*websocket.Conn]bool)
 }
 
 func handleHello(w http.ResponseWriter, r *http.Request) {
@@ -81,6 +82,7 @@ func main() {
 	http.HandleFunc("/", handleHello)
 	http.Handle(fmt.Sprintf("/%s", GROUP), websocket.Handler(handleConnection))
 	http.Handle(fmt.Sprintf("/%s", TURN), websocket.Handler(handleConnection))
+	http.Handle(fmt.Sprintf("/%s", USERS), websocket.Handler(handleConnection))
 	go handleMessage()
 
 	fmt.Println("serving at http://localhost:8080....")
