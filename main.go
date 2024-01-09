@@ -10,6 +10,8 @@ import (
 
 type Handler func (*websocket.Conn, string)
 
+var users = []string{}
+var usersMsg = ""
 var clients = make(map[string]map[*websocket.Conn]bool)
 var broadcast = make(chan Data)
 
@@ -34,7 +36,7 @@ func handleConnection(ws *websocket.Conn) {
 	key := ws.Request().URL.String()[1:]
 	clients[key][ws] = true
 
-	fmt.Println("clients: ", clients[key])
+	fmt.Println("clients:", clients[key])
 
 	// メッセージの受信
 	for {
@@ -56,6 +58,50 @@ func handleConnection(ws *websocket.Conn) {
 		fmt.Println(data)
 
 		// 受取ったメッセージをbroadcastチャネルに送る(awaitのような感じ)
+		broadcast <- data
+	}
+}
+
+func handleUsersConnection(ws *websocket.Conn) {
+	defer ws.Close()
+
+	clients[USERS][ws] = true
+
+	fmt.Println("clients:", clients[USERS])
+
+	for {
+		usersMsg = ""
+		user := ""
+
+		err := websocket.Message.Receive(ws, &user)
+		if err != nil {
+			if err.Error() == "EOF" {
+				delete(clients[USERS], ws)
+				break
+			}
+			log.Print(err)
+		}
+
+		fmt.Println(user)
+
+		if len(users) < 6 {
+			users = append(users, user)
+		}
+
+		fmt.Println(users)
+
+		for i, user := range users {
+			if i < len(users)-1 {
+				usersMsg += fmt.Sprintf("%s ", user)
+			} else {
+				usersMsg += user
+			}
+		}
+
+		fmt.Println(usersMsg)
+
+		data := Data{USERS, usersMsg}
+
 		broadcast <- data
 	}
 }
@@ -82,7 +128,7 @@ func main() {
 	http.HandleFunc("/", handleHello)
 	http.Handle(fmt.Sprintf("/%s", GROUP), websocket.Handler(handleConnection))
 	http.Handle(fmt.Sprintf("/%s", TURN), websocket.Handler(handleConnection))
-	http.Handle(fmt.Sprintf("/%s", USERS), websocket.Handler(handleConnection))
+	http.Handle(fmt.Sprintf("/%s", USERS), websocket.Handler(handleUsersConnection))
 	go handleMessage()
 
 	fmt.Println("serving at http://localhost:8080....")
