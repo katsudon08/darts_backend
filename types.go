@@ -6,6 +6,7 @@ type Data struct {
 }
 
 const (
+	NUMBER_OF_TEAM = 6
 	GROUP = "group"
 	TURN = "turn"
 	USERS = "users"

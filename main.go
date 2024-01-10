@@ -10,7 +10,7 @@ import (
 
 type Handler func (*websocket.Conn, string)
 
-var users = []string{}
+var users = make(map[*websocket.Conn]string)
 var usersMsg = ""
 var clients = make(map[string]map[*websocket.Conn]bool)
 var broadcast = make(chan Data)
@@ -65,7 +65,7 @@ func handleConnection(ws *websocket.Conn) {
 func handleUsersConnection(ws *websocket.Conn) {
 	defer ws.Close()
 
-	clients[USERS][ws] = true
+	clients[USERS][ws] = false
 
 	fmt.Println("clients:", clients[USERS])
 
@@ -82,20 +82,22 @@ func handleUsersConnection(ws *websocket.Conn) {
 			log.Print(err)
 		}
 
-		fmt.Println(user)
+		fmt.Println("preUser:",users[ws], "newUser:", user)
 
-		if len(users) < 6 {
-			users = append(users, user)
+		// ユーザーのグループ変更
+		if user != users[ws] {
+			users[ws] = user
+		}
+
+		// グループの人数制限
+		if len(users) < NUMBER_OF_TEAM && !clients[USERS][ws] {
+			clients[USERS][ws] = true
 		}
 
 		fmt.Println(users)
 
-		for i, user := range users {
-			if i < len(users)-1 {
-				usersMsg += fmt.Sprintf("%s ", user)
-			} else {
-				usersMsg += user
-			}
+		for _, user := range users {
+			usersMsg += fmt.Sprintf("%s ", user)
 		}
 
 		fmt.Println(usersMsg)
