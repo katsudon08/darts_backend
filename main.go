@@ -128,7 +128,6 @@ func handleMessage() {
 func main() {
 	initClients()
 	http.HandleFunc("/", handleHello)
-	http.Handle(fmt.Sprintf("/%s", GROUP), websocket.Handler(handleConnection))
 	http.Handle(fmt.Sprintf("/%s", TURN), websocket.Handler(handleConnection))
 	http.Handle(fmt.Sprintf("/%s", USERS), websocket.Handler(handleUsersConnection))
 	go handleMessage()
