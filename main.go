@@ -12,12 +12,13 @@ type Handler func (*websocket.Conn, string)
 
 var users = make(map[*websocket.Conn]string)
 var usersMsg = ""
+var teamcode = ""
 var clients = make(map[string]map[*websocket.Conn]bool)
 var broadcast = make(chan Data)
 
 func initClients() {
-	clients[GROUP] = make(map[*websocket.Conn]bool)
 	clients[TURN] = make(map[*websocket.Conn]bool)
+	clients[TEAM_CODE] = make(map[*websocket.Conn]bool)
 	clients[USERS] = make(map[*websocket.Conn]bool)
 }
 
@@ -54,6 +55,14 @@ func handleConnection(ws *websocket.Conn) {
 		fmt.Println(msg)
 
 		data := Data{key, msg}
+
+		if key == TEAM_CODE {
+			if msg == "" {
+				data = Data{key, teamcode}
+			} else {
+				teamcode = msg
+			}
+		}
 
 		fmt.Println(data)
 
@@ -129,6 +138,7 @@ func main() {
 	initClients()
 	http.HandleFunc("/", handleHello)
 	http.Handle(fmt.Sprintf("/%s", TURN), websocket.Handler(handleConnection))
+	http.Handle(fmt.Sprintf("/%s", TEAM_CODE), websocket.Handler(handleConnection))
 	http.Handle(fmt.Sprintf("/%s", USERS), websocket.Handler(handleUsersConnection))
 	go handleMessage()
 
