@@ -12,13 +12,13 @@ type Handler func (*websocket.Conn, string)
 
 var users = make(map[*websocket.Conn]string)
 var usersMsg = ""
-var teamcode = ""
+var teamcodes []string
 var clients = make(map[string]map[*websocket.Conn]bool)
 var broadcast = make(chan Data)
 
 func initClients() {
-	clients[TURN] = make(map[*websocket.Conn]bool)
 	clients[TEAM_CODE] = make(map[*websocket.Conn]bool)
+	clients[TURN] = make(map[*websocket.Conn]bool)
 	clients[USERS] = make(map[*websocket.Conn]bool)
 }
 
@@ -29,6 +29,44 @@ func handleHello(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Print(err)
 	}
+}
+
+// チームコードのコネクション
+
+func handleTeamCodeConnection(ws *websocket.Conn) {
+	defer ws.Close()
+
+	clients[TEAM_CODE][ws] = true
+
+	for {
+		teamcode := ""
+
+		err := websocket.Message.Receive(ws, &teamcode)
+		if err != nil {
+			if err.Error() == "EOF" {
+				// ユーザーとのストリームがEOFになるということは、ユーザーがコネクションを切断したということ
+				delete(clients[TEAM_CODE], ws)
+				break
+			}
+			log.Println(err)
+		}
+
+		fmt.Println("teamcode:", teamcode)
+
+		teamcodes = append(teamcodes, teamcode)
+	}
+}
+
+// ターンのコネクション
+
+func handleTurnConnection(ws *websocket.Conn) {
+
+}
+
+// ユーザーのコネクション
+
+func handleUsersConnection(ws *websocket.Conn) {
+
 }
 
 func handleConnection(ws *websocket.Conn) {
@@ -71,7 +109,7 @@ func handleConnection(ws *websocket.Conn) {
 	}
 }
 
-func handleUsersConnection(ws *websocket.Conn) {
+func handleUsersConnections(ws *websocket.Conn) {
 	defer ws.Close()
 
 	clients[USERS][ws] = false
@@ -137,9 +175,9 @@ func handleMessage() {
 func main() {
 	initClients()
 	http.HandleFunc("/", handleHello)
-	http.Handle(fmt.Sprintf("/%s", TURN), websocket.Handler(handleConnection))
 	http.Handle(fmt.Sprintf("/%s", TEAM_CODE), websocket.Handler(handleConnection))
-	http.Handle(fmt.Sprintf("/%s", USERS), websocket.Handler(handleUsersConnection))
+	http.Handle(fmt.Sprintf("/%s", TURN), websocket.Handler(handleConnection))
+	http.Handle(fmt.Sprintf("/%s", USERS), websocket.Handler(handleUsersConnections))
 	go handleMessage()
 
 	fmt.Println("serving at http://localhost:8080....")
