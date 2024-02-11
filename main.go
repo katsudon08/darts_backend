@@ -1,14 +1,19 @@
 package main
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 
 	"golang.org/x/net/websocket"
 )
 
-type Handler func (*websocket.Conn, string)
+type teamcodeJSON struct {
+	Teamcode string `json:"teamcode"`
+}
 
 var users = make(map[*websocket.Conn]string)
 var usersMsg = ""
@@ -33,27 +38,19 @@ func handleHello(w http.ResponseWriter, r *http.Request) {
 
 // チームコードのコネクション
 
-func handleTeamCodeConnection(ws *websocket.Conn) {
-	defer ws.Close()
+func handleTeamCode(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodPost:
+		body := r.Body
+		defer body.Close()
 
-	clients[TEAM_CODE][ws] = true
+		buf := new(bytes.Buffer)
+		io.Copy(buf, body)
 
-	for {
-		teamcode := ""
+		var teamcode teamcodeJSON
+		json.Unmarshal(buf.Bytes(), &teamcode)
 
-		err := websocket.Message.Receive(ws, &teamcode)
-		if err != nil {
-			if err.Error() == "EOF" {
-				// ユーザーとのストリームがEOFになるということは、ユーザーがコネクションを切断したということ
-				delete(clients[TEAM_CODE], ws)
-				break
-			}
-			log.Println(err)
-		}
-
-		fmt.Println("teamcode:", teamcode)
-
-		teamcodes = append(teamcodes, teamcode)
+		fmt.Println(teamcode)
 	}
 }
 
@@ -94,13 +91,13 @@ func handleConnection(ws *websocket.Conn) {
 
 		data := Data{key, msg}
 
-		if key == TEAM_CODE {
-			if msg == "" {
-				data = Data{key, teamcode}
-			} else {
-				teamcode = msg
-			}
-		}
+		// if key == TEAM_CODE {
+		// 	if msg == "" {
+		// 		data = Data{key, teamcode}
+		// 	} else {
+		// 		teamcode = msg
+		// 	}
+		// }
 
 		fmt.Println(data)
 
@@ -175,7 +172,7 @@ func handleMessage() {
 func main() {
 	initClients()
 	http.HandleFunc("/", handleHello)
-	http.Handle(fmt.Sprintf("/%s", TEAM_CODE), websocket.Handler(handleConnection))
+	http.HandleFunc(fmt.Sprintf("/%s", TEAM_CODE), handleTeamCode)
 	http.Handle(fmt.Sprintf("/%s", TURN), websocket.Handler(handleConnection))
 	http.Handle(fmt.Sprintf("/%s", USERS), websocket.Handler(handleUsersConnections))
 	go handleMessage()
