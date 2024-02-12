@@ -38,7 +38,7 @@ func handleHello(w http.ResponseWriter, r *http.Request) {
 
 // チームコードのコネクション
 
-func handleTeamCode(w http.ResponseWriter, r *http.Request) {
+func handleCreateTeamCode(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodPost:
 		body := r.Body
@@ -47,10 +47,56 @@ func handleTeamCode(w http.ResponseWriter, r *http.Request) {
 		buf := new(bytes.Buffer)
 		io.Copy(buf, body)
 
-		var teamcode teamcodeJSON
-		json.Unmarshal(buf.Bytes(), &teamcode)
+		var data teamcodeJSON
+		json.Unmarshal(buf.Bytes(), &data)
 
-		fmt.Println(teamcode)
+		teamcode := data.Teamcode
+		fmt.Println("teamcode_create:", teamcode)
+
+		for _, value := range teamcodes {
+			if value == teamcode {
+				continue
+			}
+		}
+
+		teamcodes = append(teamcodes, teamcode)
+
+		_, err := w.Write([]byte(teamcode))
+		if err != nil {
+			log.Print(err)
+		}
+	}
+}
+
+func handleJoinTeamCode(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodPost:
+		body := r.Body
+		defer body.Close()
+
+		buf := new(bytes.Buffer)
+		io.Copy(buf, body)
+
+		var data teamcodeJSON
+		json.Unmarshal(buf.Bytes(), &data)
+
+		teamcode := data.Teamcode
+		fmt.Println("teamcode_join:", teamcode)
+
+		for _, value := range teamcodes {
+			if teamcode == value {
+				_, err := w.Write([]byte("true"))
+				if err != nil {
+					log.Print(err)
+				}
+				continue
+			}
+		}
+
+		_, err := w.Write([]byte("false"))
+		if err != nil {
+			log.Print(err)
+		}
 	}
 }
 
@@ -172,7 +218,8 @@ func handleMessage() {
 func main() {
 	initClients()
 	http.HandleFunc("/", handleHello)
-	http.HandleFunc(fmt.Sprintf("/%s", TEAM_CODE), handleTeamCode)
+	http.HandleFunc(fmt.Sprintf("/%s/%s", TEAM_CODE, CREATE), handleCreateTeamCode)
+	http.HandleFunc(fmt.Sprintf("/%s/%s", TEAM_CODE, JOIN), handleJoinTeamCode)
 	http.Handle(fmt.Sprintf("/%s", TURN), websocket.Handler(handleConnection))
 	http.Handle(fmt.Sprintf("/%s", USERS), websocket.Handler(handleUsersConnections))
 	go handleMessage()
