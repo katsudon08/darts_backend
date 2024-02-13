@@ -52,14 +52,20 @@ func handleCreateTeamCode(w http.ResponseWriter, r *http.Request) {
 
 		teamcode := data.Teamcode
 		fmt.Println("teamcode_create:", teamcode)
+		fmt.Println(r.Host)
+
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Access-Control-Allow-Origin", fmt.Sprintf("http://%s, https://%s", r.Host, r.Host))
+		w.Header().Set("Access-Control-Allow-Methods", "POST")
 
 		for _, value := range teamcodes {
 			if value == teamcode {
-				continue
+				return
 			}
 		}
 
 		teamcodes = append(teamcodes, teamcode)
+		fmt.Println(teamcodes)
 
 		_, err := w.Write([]byte(teamcode))
 		if err != nil {
@@ -82,20 +88,19 @@ func handleJoinTeamCode(w http.ResponseWriter, r *http.Request) {
 
 		teamcode := data.Teamcode
 		fmt.Println("teamcode_join:", teamcode)
+		fmt.Println(r.Host)
+
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Access-Control-Allow-Origin", fmt.Sprintf("http://%s, https://%s", r.Host, r.Host))
+		w.Header().Set("Access-Control-Allow-Methods", "POST")
 
 		for _, value := range teamcodes {
 			if teamcode == value {
-				_, err := w.Write([]byte("true"))
+				_, err := w.Write([]byte(teamcode))
 				if err != nil {
 					log.Print(err)
 				}
-				continue
 			}
-		}
-
-		_, err := w.Write([]byte("false"))
-		if err != nil {
-			log.Print(err)
 		}
 	}
 }
