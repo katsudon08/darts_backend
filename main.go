@@ -7,7 +7,6 @@ import (
 	"io"
 	"log"
 	"net/http"
-
 	"golang.org/x/net/websocket"
 )
 
@@ -18,6 +17,7 @@ type teamcodeJSON struct {
 var users = make(map[*websocket.Conn]string)
 var usersMsg = ""
 var teamcodes []string
+var stopChan = make(chan bool)
 var clients = make(map[string]map[*websocket.Conn]bool)
 var broadcast = make(chan Data)
 
@@ -64,8 +64,12 @@ func handleCreateTeamCode(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
+		stopChan <- true
+
 		teamcodes = append(teamcodes, teamcode)
 		fmt.Println(teamcodes)
+
+		go worker(stopChan)
 
 		_, err := w.Write([]byte(teamcode))
 		if err != nil {
@@ -220,12 +224,25 @@ func handleMessage() {
 	}
 }
 
+func worker(stopChan chan bool) {
+	for _, value := range teamcodes {
+		fmt.Println("handler", value)
+		http.Handle(fmt.Sprintf("/%s/%s", TURN, value), websocket.Handler(handleConnection))
+	}
+
+	for {
+		<-stopChan
+		fmt.Println("stopping...")
+		return
+	}
+}
+
 func main() {
 	initClients()
 	http.HandleFunc("/", handleHello)
 	http.HandleFunc(fmt.Sprintf("/%s/%s", TEAM_CODE, CREATE), handleCreateTeamCode)
 	http.HandleFunc(fmt.Sprintf("/%s/%s", TEAM_CODE, JOIN), handleJoinTeamCode)
-	http.Handle(fmt.Sprintf("/%s", TURN), websocket.Handler(handleConnection))
+	go worker(stopChan)
 	http.Handle(fmt.Sprintf("/%s", USERS), websocket.Handler(handleUsersConnections))
 	go handleMessage()
 
