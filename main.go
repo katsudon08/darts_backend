@@ -12,18 +12,14 @@ import (
 	"golang.org/x/net/websocket"
 )
 
-type teamcodeJSON struct {
-	Teamcode string `json:"teamcode"`
-}
-
 var users = make(map[*websocket.Conn]string)
 var usersMsg = ""
 var teamcodes = []string{}
-var clients = make(map[string]map[*websocket.Conn]bool)
+var clients = make(map[string]map[*websocket.Conn]string)
 var broadcast = make(chan Data)
 
 func initClients() {
-	clients[TURN] = make(map[*websocket.Conn]bool)
+	clients[TURN] = make(map[*websocket.Conn]string)
 	clients[USERS] = make(map[*websocket.Conn]bool)
 }
 
@@ -109,7 +105,7 @@ func handleJoinTeamCode(w http.ResponseWriter, r *http.Request) {
 func handleTurnConnection(ws *websocket.Conn) {
 	defer ws.Close()
 
-	clients[TURN][ws] = true
+	clients[TURN][ws] = ""
 
 	fmt.Println("turn_clients:", clients[TURN])
 
@@ -120,7 +116,22 @@ func handleTurnConnection(ws *websocket.Conn) {
 		if err != nil {
 			// 通信切断時
 			if err.Error() == "EOF" {
+				flag := true
 				delete(clients[TURN], ws)
+				for key, teamcodesValue := range teamcodes {
+					for _, clientsValue := range clients[TURN] {
+						if teamcodesValue == clientsValue {
+							flag = false
+						}
+					}
+					if flag {
+						tmp := []string{}
+						tmp = append(tmp, teamcodes[:key-1]...)
+						teamcodes = append(tmp, teamcodes[key+1:]...)
+						return
+					}
+				}
+
 				return
 			}
 			panic(err)
@@ -130,6 +141,8 @@ func handleTurnConnection(ws *websocket.Conn) {
 		splittedMsg := strings.Split(msg, MARK)
 		teamcode, msg := splittedMsg[0], splittedMsg[1]
 		fmt.Println(teamcode, msg)
+
+		clients[TURN][ws] = teamcode
 
 		data := Data{TURN, teamcode, msg}
 
@@ -141,46 +154,6 @@ func handleTurnConnection(ws *websocket.Conn) {
 
 func handleUsersConnection(ws *websocket.Conn) {
 
-}
-
-func handleConnection(ws *websocket.Conn) {
-	defer ws.Close()
-
-	key := ws.Request().URL.String()[1:]
-	clients[key][ws] = true
-
-	fmt.Println("clients:", clients[key])
-
-	// メッセージの受信
-	for {
-		msg := ""
-
-		err := websocket.Message.Receive(ws, &msg)
-		if err != nil {
-			if err.Error() == "EOF" {
-				delete(clients[key], ws)
-				return
-			}
-			panic(err)
-		}
-
-		fmt.Println(msg)
-
-		data := Data{key, msg}
-
-		// if key == TEAM_CODE {
-		// 	if msg == "" {
-		// 		data = Data{key, teamcode}
-		// 	} else {
-		// 		teamcode = msg
-		// 	}
-		// }
-
-		fmt.Println(data)
-
-		// 受取ったメッセージをbroadcastチャネルに送る(awaitのような感じ)
-		broadcast <- data
-	}
 }
 
 func handleUsersConnections(ws *websocket.Conn) {
@@ -229,6 +202,8 @@ func handleUsersConnections(ws *websocket.Conn) {
 	}
 }
 
+// メッセージの送信
+
 func handleMessage() {
 	for {
 		// broadcastからメッセージを受取る
@@ -237,10 +212,12 @@ func handleMessage() {
 		fmt.Println(fmt.Sprintf("msg/clients[%s]:", data.Key), clients[data.Key])
 
 		// 各クライアントへのメッセージの送信
-		for client := range clients[data.Key] {
-			err := websocket.Message.Send(client, data.Msg)
-			if err != nil {
-				panic(err)
+		for client, teamcode := range clients[data.Key] {
+			if teamcode == data.TeamCode {
+				err := websocket.Message.Send(client, data.Msg)
+				if err != nil {
+					panic(err)
+				}
 			}
 		}
 	}

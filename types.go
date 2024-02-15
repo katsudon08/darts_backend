@@ -6,6 +6,10 @@ type Data struct {
 	Msg string
 }
 
+type teamcodeJSON struct {
+	Teamcode string `json:"teamcode"`
+}
+
 const (
 	NUMBER_OF_TEAM = 6
 	TURN = "turn"
