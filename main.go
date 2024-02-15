@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net"
 	"net/http"
+
 	"golang.org/x/net/websocket"
 )
 
@@ -16,13 +18,11 @@ type teamcodeJSON struct {
 
 var users = make(map[*websocket.Conn]string)
 var usersMsg = ""
-var teamcodes []string
-var stopChan = make(chan bool)
 var clients = make(map[string]map[*websocket.Conn]bool)
 var broadcast = make(chan Data)
+var listeners = make(map[string]net.Listener)
 
 func initClients() {
-	clients[TEAM_CODE] = make(map[*websocket.Conn]bool)
 	clients[TURN] = make(map[*websocket.Conn]bool)
 	clients[USERS] = make(map[*websocket.Conn]bool)
 }
@@ -32,7 +32,7 @@ func handleHello(w http.ResponseWriter, r *http.Request) {
 	_, err := w.Write(hello)
 
 	if err != nil {
-		log.Print(err)
+		panic(err)
 	}
 }
 
@@ -58,23 +58,24 @@ func handleCreateTeamCode(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", fmt.Sprintf("http://%s, https://%s", r.Host, r.Host))
 		w.Header().Set("Access-Control-Allow-Methods", "POST")
 
-		for _, value := range teamcodes {
-			if value == teamcode {
+		for key := range listeners {
+			if key == teamcode {
 				return
 			}
 		}
 
-		stopChan <- true
+		// TODO: チームコードのwebsocketを作成
+		listener, ch := server(":8080", teamcode)
+		fmt.Println("websocket: ", listener.Addr())
 
-		teamcodes = append(teamcodes, teamcode)
-		fmt.Println(teamcodes)
-
-		go worker(stopChan)
+		listeners[teamcode] = listener
 
 		_, err := w.Write([]byte(teamcode))
 		if err != nil {
-			log.Print(err)
+			panic(err)
 		}
+
+		fmt.Println(ch)
 	}
 }
 
@@ -98,11 +99,11 @@ func handleJoinTeamCode(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", fmt.Sprintf("http://%s, https://%s", r.Host, r.Host))
 		w.Header().Set("Access-Control-Allow-Methods", "POST")
 
-		for _, value := range teamcodes {
-			if teamcode == value {
+		for key := range listeners {
+			if key == teamcode {
 				_, err := w.Write([]byte(teamcode))
 				if err != nil {
-					log.Print(err)
+					panic(err)
 				}
 			}
 		}
@@ -139,10 +140,16 @@ func handleConnection(ws *websocket.Conn) {
 				delete(clients[key], ws)
 				break
 			}
-			log.Print(err)
+			panic(err)
 		}
 
 		fmt.Println(msg)
+
+		for key, value := range listeners {
+			if key == msg {
+				value.Close()
+			}
+		}
 
 		data := Data{key, msg}
 
@@ -178,7 +185,7 @@ func handleUsersConnections(ws *websocket.Conn) {
 				delete(clients[USERS], ws)
 				break
 			}
-			log.Print(err)
+			panic(err)
 		}
 
 		fmt.Println("preUser:",users[ws], "newUser:", user)
@@ -218,23 +225,32 @@ func handleMessage() {
 		for client := range clients[data.Key] {
 			err := websocket.Message.Send(client, data.Msg)
 			if err != nil {
-				log.Print(err)
+				panic(err)
 			}
 		}
 	}
 }
 
-func worker(stopChan chan bool) {
-	for _, value := range teamcodes {
-		fmt.Println("handler", value)
-		http.Handle(fmt.Sprintf("/%s/%s", TURN, value), websocket.Handler(handleConnection))
+func routes(teamcode string) (mux *http.ServeMux) {
+	mux = http.NewServeMux()
+	mux.Handle(fmt.Sprintf("/%s/%s", TURN, teamcode), websocket.Handler(handleConnection))
+	return
+}
+
+func server(addr string, teamcode string) (listener net.Listener, ch chan error) {
+	ch = make(chan error)
+
+	listener, err := net.Listen("tcp", addr)
+	if err != nil {
+		panic(err)
 	}
 
-	for {
-		<-stopChan
-		fmt.Println("stopping...")
-		return
-	}
+	go func()  {
+		mux := routes(teamcode)
+		ch <- http.Serve(listener, mux)
+	}()
+
+	return
 }
 
 func main() {
@@ -242,7 +258,7 @@ func main() {
 	http.HandleFunc("/", handleHello)
 	http.HandleFunc(fmt.Sprintf("/%s/%s", TEAM_CODE, CREATE), handleCreateTeamCode)
 	http.HandleFunc(fmt.Sprintf("/%s/%s", TEAM_CODE, JOIN), handleJoinTeamCode)
-	go worker(stopChan)
+	http.Handle(fmt.Sprintf("/%s", TURN), websocket.Handler(handleConnection))
 	http.Handle(fmt.Sprintf("/%s", USERS), websocket.Handler(handleUsersConnections))
 	go handleMessage()
 
