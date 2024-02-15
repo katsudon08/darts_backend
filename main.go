@@ -20,7 +20,7 @@ var broadcast = make(chan Data)
 
 func initClients() {
 	clients[TURN] = make(map[*websocket.Conn]string)
-	clients[USERS] = make(map[*websocket.Conn]bool)
+	// clients[USERS] = make(map[*websocket.Conn]bool)
 }
 
 func handleHello(w http.ResponseWriter, r *http.Request) {
@@ -100,6 +100,30 @@ func handleJoinTeamCode(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func deleteSliceFactor(array []string, key int) (result []string){
+	tmp := []string{}
+	tmp = append(tmp, array[:key]...)
+	result = append(tmp, array[key+1:]...)
+	return
+}
+
+func deleteTeamCodeFromClientsDiff(mux string, ws *websocket.Conn) {
+	flag := true
+	delete(clients[mux], ws)
+	for key, teamcodesValue := range teamcodes {
+		for _, clientsValue := range clients[mux] {
+			if teamcodesValue == clientsValue {
+				flag = false
+			}
+		}
+		if flag {
+			teamcodes = deleteSliceFactor(teamcodes, key)
+			fmt.Println("teamcodes", teamcodes)
+			return
+		}
+	}
+}
+
 // ターンのコネクション
 
 func handleTurnConnection(ws *websocket.Conn) {
@@ -116,22 +140,7 @@ func handleTurnConnection(ws *websocket.Conn) {
 		if err != nil {
 			// 通信切断時
 			if err.Error() == "EOF" {
-				flag := true
-				delete(clients[TURN], ws)
-				for key, teamcodesValue := range teamcodes {
-					for _, clientsValue := range clients[TURN] {
-						if teamcodesValue == clientsValue {
-							flag = false
-						}
-					}
-					if flag {
-						tmp := []string{}
-						tmp = append(tmp, teamcodes[:key-1]...)
-						teamcodes = append(tmp, teamcodes[key+1:]...)
-						return
-					}
-				}
-
+				go deleteTeamCodeFromClientsDiff(TURN, ws)
 				return
 			}
 			panic(err)
@@ -156,6 +165,7 @@ func handleUsersConnection(ws *websocket.Conn) {
 
 }
 
+/*
 func handleUsersConnections(ws *websocket.Conn) {
 	defer ws.Close()
 
@@ -201,6 +211,7 @@ func handleUsersConnections(ws *websocket.Conn) {
 		broadcast <- data
 	}
 }
+*/
 
 // メッセージの送信
 
@@ -229,7 +240,7 @@ func main() {
 	http.HandleFunc(fmt.Sprintf("/%s/%s", TEAM_CODE, CREATE), handleCreateTeamCode)
 	http.HandleFunc(fmt.Sprintf("/%s/%s", TEAM_CODE, JOIN), handleJoinTeamCode)
 	http.Handle(fmt.Sprintf("/%s", TURN), websocket.Handler(handleTurnConnection))
-	http.Handle(fmt.Sprintf("/%s", USERS), websocket.Handler(handleUsersConnections))
+	// http.Handle(fmt.Sprintf("/%s", USERS), websocket.Handler(handleUsersConnections))
 	go handleMessage()
 
 	fmt.Println("serving at http://localhost:8080....")
