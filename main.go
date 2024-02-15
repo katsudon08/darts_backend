@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"net"
 	"net/http"
+	"strings"
 
 	"golang.org/x/net/websocket"
 )
@@ -18,9 +18,9 @@ type teamcodeJSON struct {
 
 var users = make(map[*websocket.Conn]string)
 var usersMsg = ""
+var teamcodes = []string{}
 var clients = make(map[string]map[*websocket.Conn]bool)
 var broadcast = make(chan Data)
-var listeners = make(map[string]net.Listener)
 
 func initClients() {
 	clients[TURN] = make(map[*websocket.Conn]bool)
@@ -58,24 +58,18 @@ func handleCreateTeamCode(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", fmt.Sprintf("http://%s, https://%s", r.Host, r.Host))
 		w.Header().Set("Access-Control-Allow-Methods", "POST")
 
-		for key := range listeners {
-			if key == teamcode {
+		for _, value := range teamcodes {
+			if value == teamcode {
 				return
 			}
 		}
 
-		// TODO: チームコードのwebsocketを作成
-		listener, ch := server(":8080", teamcode)
-		fmt.Println("websocket: ", listener.Addr())
-
-		listeners[teamcode] = listener
+		teamcodes = append(teamcodes, teamcode)
 
 		_, err := w.Write([]byte(teamcode))
 		if err != nil {
 			panic(err)
 		}
-
-		fmt.Println(ch)
 	}
 }
 
@@ -99,8 +93,8 @@ func handleJoinTeamCode(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", fmt.Sprintf("http://%s, https://%s", r.Host, r.Host))
 		w.Header().Set("Access-Control-Allow-Methods", "POST")
 
-		for key := range listeners {
-			if key == teamcode {
+		for _, value := range teamcodes {
+			if value == teamcode {
 				_, err := w.Write([]byte(teamcode))
 				if err != nil {
 					panic(err)
@@ -113,7 +107,34 @@ func handleJoinTeamCode(w http.ResponseWriter, r *http.Request) {
 // ターンのコネクション
 
 func handleTurnConnection(ws *websocket.Conn) {
+	defer ws.Close()
 
+	clients[TURN][ws] = true
+
+	fmt.Println("turn_clients:", clients[TURN])
+
+	for {
+		msg := ""
+
+		err := websocket.Message.Receive(ws, &msg)
+		if err != nil {
+			// 通信切断時
+			if err.Error() == "EOF" {
+				delete(clients[TURN], ws)
+				return
+			}
+			panic(err)
+		}
+
+		fmt.Println(msg)
+		splittedMsg := strings.Split(msg, MARK)
+		teamcode, msg := splittedMsg[0], splittedMsg[1]
+		fmt.Println(teamcode, msg)
+
+		data := Data{TURN, teamcode, msg}
+
+		broadcast <- data
+	}
 }
 
 // ユーザーのコネクション
@@ -138,18 +159,12 @@ func handleConnection(ws *websocket.Conn) {
 		if err != nil {
 			if err.Error() == "EOF" {
 				delete(clients[key], ws)
-				break
+				return
 			}
 			panic(err)
 		}
 
 		fmt.Println(msg)
-
-		for key, value := range listeners {
-			if key == msg {
-				value.Close()
-			}
-		}
 
 		data := Data{key, msg}
 
@@ -219,7 +234,7 @@ func handleMessage() {
 		// broadcastからメッセージを受取る
 		data := <- broadcast
 
-		fmt.Println("msg/clients: ", clients[data.Key])
+		fmt.Println(fmt.Sprintf("msg/clients[%s]:", data.Key), clients[data.Key])
 
 		// 各クライアントへのメッセージの送信
 		for client := range clients[data.Key] {
@@ -231,34 +246,12 @@ func handleMessage() {
 	}
 }
 
-func routes(teamcode string) (mux *http.ServeMux) {
-	mux = http.NewServeMux()
-	mux.Handle(fmt.Sprintf("/%s/%s", TURN, teamcode), websocket.Handler(handleConnection))
-	return
-}
-
-func server(addr string, teamcode string) (listener net.Listener, ch chan error) {
-	ch = make(chan error)
-
-	listener, err := net.Listen("tcp", addr)
-	if err != nil {
-		panic(err)
-	}
-
-	go func()  {
-		mux := routes(teamcode)
-		ch <- http.Serve(listener, mux)
-	}()
-
-	return
-}
-
 func main() {
 	initClients()
 	http.HandleFunc("/", handleHello)
 	http.HandleFunc(fmt.Sprintf("/%s/%s", TEAM_CODE, CREATE), handleCreateTeamCode)
 	http.HandleFunc(fmt.Sprintf("/%s/%s", TEAM_CODE, JOIN), handleJoinTeamCode)
-	http.Handle(fmt.Sprintf("/%s", TURN), websocket.Handler(handleConnection))
+	http.Handle(fmt.Sprintf("/%s", TURN), websocket.Handler(handleTurnConnection))
 	http.Handle(fmt.Sprintf("/%s", USERS), websocket.Handler(handleUsersConnections))
 	go handleMessage()
 

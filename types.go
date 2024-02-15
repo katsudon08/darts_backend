@@ -2,6 +2,7 @@ package main
 
 type Data struct {
 	Key string
+	TeamCode string
 	Msg string
 }
 
@@ -12,4 +13,5 @@ const (
 	CREATE = "create"
 	JOIN = "join"
 	USERS = "users"
+	MARK = "[:::]"
 )
