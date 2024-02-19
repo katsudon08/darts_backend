@@ -12,15 +12,15 @@ import (
 	"golang.org/x/net/websocket"
 )
 
-var users = make(map[*websocket.Conn]string)
-var usersMsg = ""
+var users = make(map[string]string)
+var preUser = make(map[*websocket.Conn]string)
 var teamcodes = []string{}
 var clients = make(map[string]map[*websocket.Conn]string)
 var broadcast = make(chan Data)
 
 func initClients() {
 	clients[TURN] = make(map[*websocket.Conn]string)
-	// clients[USERS] = make(map[*websocket.Conn]bool)
+	clients[USERS] = make(map[*websocket.Conn]string)
 }
 
 func handleHello(w http.ResponseWriter, r *http.Request) {
@@ -117,6 +117,9 @@ func deleteTeamCodeFromClientsDiff(mux string, ws *websocket.Conn) {
 			}
 		}
 		if flag {
+			if mux == USERS {
+				delete(users, teamcodes[key])
+			}
 			teamcodes = deleteSliceFactor(teamcodes, key)
 			fmt.Println("teamcodes", teamcodes)
 			return
@@ -162,7 +165,37 @@ func handleTurnConnection(ws *websocket.Conn) {
 // ユーザーのコネクション
 
 func handleUsersConnection(ws *websocket.Conn) {
+	defer ws.Close()
 
+	clients[USERS][ws] = ""
+
+	fmt.Println("users_clients", clients[USERS])
+
+	for {
+		msg := ""
+
+		err := websocket.Message.Receive(ws, &msg)
+		if err != nil {
+			if err.Error() == "EOF" {
+				go deleteTeamCodeFromClientsDiff(USERS, ws)
+				return
+			}
+			panic(err)
+		}
+
+		fmt.Println(msg)
+		splittedMsg := strings.Split(msg, MARK)
+		teamcode, num, user := splittedMsg[0], splittedMsg[1], splittedMsg[2]
+		msg = fmt.Sprintf("%s:%s", string(num), user)
+		fmt.Println(teamcode, msg)
+
+		clients[USERS][ws] = teamcode
+		users[teamcode] += fmt.Sprintf("%s ", msg)
+
+		data := Data{USERS, teamcode, users[teamcode]}
+
+		broadcast <- data
+	}
 }
 
 /*
@@ -240,7 +273,7 @@ func main() {
 	http.HandleFunc(fmt.Sprintf("/%s/%s", TEAM_CODE, CREATE), handleCreateTeamCode)
 	http.HandleFunc(fmt.Sprintf("/%s/%s", TEAM_CODE, JOIN), handleJoinTeamCode)
 	http.Handle(fmt.Sprintf("/%s", TURN), websocket.Handler(handleTurnConnection))
-	// http.Handle(fmt.Sprintf("/%s", USERS), websocket.Handler(handleUsersConnections))
+	http.Handle(fmt.Sprintf("/%s", USERS), websocket.Handler(handleUsersConnection))
 	go handleMessage()
 
 	fmt.Println("serving at http://localhost:8080....")
