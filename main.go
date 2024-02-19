@@ -7,13 +7,13 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"sort"
 	"strings"
 
 	"golang.org/x/net/websocket"
 )
 
-var users = make(map[string]string)
-var preUser = make(map[*websocket.Conn]string)
+var users = make(map[string]UsersData)
 var teamcodes = []string{}
 var clients = make(map[string]map[*websocket.Conn]string)
 var broadcast = make(chan Data)
@@ -127,6 +127,14 @@ func deleteTeamCodeFromClientsDiff(mux string, ws *websocket.Conn) {
 	}
 }
 
+func createMessageFromUsers(users []UserData) (msg string) {
+	msg = ""
+	for _, user := range users {
+		msg += fmt.Sprintf("%s ", user.UserName)
+	}
+	return
+}
+
 // ターンのコネクション
 
 func handleTurnConnection(ws *websocket.Conn) {
@@ -186,14 +194,27 @@ func handleUsersConnection(ws *websocket.Conn) {
 		fmt.Println(msg)
 		splittedMsg := strings.Split(msg, MARK)
 		teamcode, num, user := splittedMsg[0], splittedMsg[1], splittedMsg[2]
-		msg = fmt.Sprintf("%s:%s", string(num), user)
 		fmt.Println(teamcode, msg)
 
 		clients[USERS][ws] = teamcode
-		users[teamcode] += fmt.Sprintf("%s ", msg)
+		userData := UserData{ws, num, user}
 
-		data := Data{USERS, teamcode, users[teamcode]}
+		flagForUnaddedUser := true
 
+		for key, value := range users[teamcode] {
+			if value.CheckUserWsIsCorrect(userData) {
+				flagForUnaddedUser = false
+				users[teamcode][key] = userData
+			}
+		}
+
+		if flagForUnaddedUser {
+			users[teamcode] = append(users[teamcode], userData)
+		}
+
+		sort.Sort(users[teamcode])
+		msg = createMessageFromUsers(users[teamcode])
+		data := Data{USERS, teamcode, msg}
 		broadcast <- data
 	}
 }
