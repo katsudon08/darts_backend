@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"sort"
 	"strings"
-
 	"golang.org/x/net/websocket"
 )
 
@@ -130,7 +129,7 @@ func deleteTeamCodeFromClientsDiff(mux string, ws *websocket.Conn) {
 func createMessageFromUsers(users []UserData) (msg string) {
 	msg = ""
 	for _, user := range users {
-		msg += fmt.Sprintf("%s ", user.UserName)
+		msg += fmt.Sprintf("%s%s%s ", user.GroupNum, MARK, user.UserName)
 	}
 	return
 }
@@ -181,7 +180,6 @@ func handleUsersConnection(ws *websocket.Conn) {
 
 	for {
 		msg := ""
-
 		err := websocket.Message.Receive(ws, &msg)
 		if err != nil {
 			if err.Error() == "EOF" {
@@ -193,79 +191,44 @@ func handleUsersConnection(ws *websocket.Conn) {
 
 		fmt.Println(msg)
 		splittedMsg := strings.Split(msg, MARK)
-		teamcode, num, user := splittedMsg[0], splittedMsg[1], splittedMsg[2]
-		fmt.Println(teamcode, msg)
+		fmt.Println(splittedMsg)
 
-		clients[USERS][ws] = teamcode
-		userData := UserData{ws, num, user}
+		teamcode := splittedMsg[0]
 
-		flagForUnaddedUser := true
+		if len(splittedMsg) < 3 {
+			sort.Sort(users[teamcode])
+			msg = createMessageFromUsers(users[teamcode])
+			data := Data{USERS, teamcode, msg}
+			broadcast <- data
+		} else {
+			num, user := splittedMsg[1], splittedMsg[2]
+			fmt.Println(teamcode, num, user)
 
-		for key, value := range users[teamcode] {
-			if value.CheckUserWsIsCorrect(userData) {
-				flagForUnaddedUser = false
-				users[teamcode][key] = userData
+			if clients[USERS][ws] != teamcode {
+				clients[USERS][ws] = teamcode
 			}
-		}
+			userData := UserData{ws, num, user}
 
-		if flagForUnaddedUser {
-			users[teamcode] = append(users[teamcode], userData)
-		}
+			flagForUnaddedUser := true
 
-		sort.Sort(users[teamcode])
-		msg = createMessageFromUsers(users[teamcode])
-		data := Data{USERS, teamcode, msg}
-		broadcast <- data
+			for key, value := range users[teamcode] {
+				if value.CheckUserWsIsCorrect(userData) {
+					flagForUnaddedUser = false
+					users[teamcode][key] = userData
+				}
+			}
+
+			if flagForUnaddedUser {
+				users[teamcode] = append(users[teamcode], userData)
+			}
+
+			sort.Sort(users[teamcode])
+			msg = createMessageFromUsers(users[teamcode])
+			data := Data{USERS, teamcode, msg}
+			broadcast <- data
+		}
 	}
 }
-
-/*
-func handleUsersConnections(ws *websocket.Conn) {
-	defer ws.Close()
-
-	clients[USERS][ws] = false
-
-	fmt.Println("clients:", clients[USERS])
-
-	for {
-		usersMsg = ""
-		user := ""
-
-		err := websocket.Message.Receive(ws, &user)
-		if err != nil {
-			if err.Error() == "EOF" {
-				delete(clients[USERS], ws)
-				break
-			}
-			panic(err)
-		}
-
-		fmt.Println("preUser:",users[ws], "newUser:", user)
-
-		// ユーザーのグループ変更
-		if user != users[ws] {
-			users[ws] = user
-		}
-
-		// グループの人数制限
-		if len(users) < NUMBER_OF_TEAM && !clients[USERS][ws] {
-			clients[USERS][ws] = true
-		}
-
-		fmt.Println(users)
-
-		for _, user := range users {
-			usersMsg += fmt.Sprintf("%s ", user)
-		}
-
-		fmt.Println(usersMsg)
-
-		data := Data{USERS, usersMsg}
-
-		broadcast <- data
-	}
-}
-*/
 
 // メッセージの送信
 
