@@ -14,6 +14,7 @@ import (
 
 var users = make(map[string]UsersData)
 var teamcodes = []string{}
+var teamturn = make(map[string]string)
 var clients = make(map[string]map[*websocket.Conn]string)
 var broadcast = make(chan Data)
 
@@ -158,14 +159,24 @@ func handleTurnConnection(ws *websocket.Conn) {
 
 		fmt.Println(msg)
 		splittedMsg := strings.Split(msg, MARK)
-		teamcode, msg := splittedMsg[0], splittedMsg[1]
-		fmt.Println(teamcode, msg)
+
+		teamcode := splittedMsg[0]
+		fmt.Println("teamcode:", teamcode)
 
 		clients[TURN][ws] = teamcode
+		fmt.Println("turn teamcode:",clients[TURN][ws])
 
-		data := Data{TURN, teamcode, msg}
+		if len(splittedMsg) < 2 {
+			data := Data{TURN, teamcode, teamturn[teamcode]}
+			broadcast <- data
+		} else {
+			msg := splittedMsg[1]
+			fmt.Println(teamcode, msg)
+			teamturn[teamcode] = msg
 
-		broadcast <- data
+			data := Data{TURN, teamcode, msg}
+			broadcast <- data
+		}
 	}
 }
 
@@ -194,9 +205,14 @@ func handleUsersConnection(ws *websocket.Conn) {
 		fmt.Println(splittedMsg)
 
 		teamcode := splittedMsg[0]
+		fmt.Println("teamcode:", teamcode)
+
+		clients[USERS][ws] = teamcode
+		fmt.Println("user teamcode:", clients[USERS][ws])
 
 		if len(splittedMsg) < 3 {
 			sort.Sort(users[teamcode])
+			fmt.Println("get users data:", users[teamcode])
 			msg = createMessageFromUsers(users[teamcode])
 			data := Data{USERS, teamcode, msg}
 			broadcast <- data
@@ -204,9 +220,6 @@ func handleUsersConnection(ws *websocket.Conn) {
 			num, user := splittedMsg[1], splittedMsg[2]
 			fmt.Println(teamcode, num, user)
 
-			if clients[USERS][ws] != teamcode {
-				clients[USERS][ws] = teamcode
-			}
 			userData := UserData{ws, num, user}
 
 			flagForUnaddedUser := true
@@ -223,6 +236,7 @@ func handleUsersConnection(ws *websocket.Conn) {
 			}
 
 			sort.Sort(users[teamcode])
+			fmt.Println("create or change users data:", users[teamcode])
 			msg = createMessageFromUsers(users[teamcode])
 			data := Data{USERS, teamcode, msg}
 			broadcast <- data
