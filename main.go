@@ -100,8 +100,15 @@ func handleJoinTeamCode(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func deleteSliceFactor(array []string, key int) (result []string){
+func deleteStringSliceFactor(array []string, key int) (result []string) {
 	tmp := []string{}
+	tmp = append(tmp, array[:key]...)
+	result = append(tmp, array[key+1:]...)
+	return
+}
+
+func deleteUserDataSliceFactor(array []UserData, key int) (result []UserData) {
+	tmp := []UserData{}
 	tmp = append(tmp, array[:key]...)
 	result = append(tmp, array[key+1:]...)
 	return
@@ -120,8 +127,17 @@ func deleteTeamCodeFromClientsDiff(mux string, ws *websocket.Conn) {
 			if mux == USERS {
 				delete(users, teamcodes[key])
 			}
-			teamcodes = deleteSliceFactor(teamcodes, key)
+			teamcodes = deleteStringSliceFactor(teamcodes, key)
 			fmt.Println("teamcodes", teamcodes)
+			return
+		}
+	}
+}
+
+func deleteUserFromUsers(teamcode string, ws *websocket.Conn) {
+	for key, value := range users[teamcode] {
+		if value.Ws == ws {
+			users[teamcode] = deleteUserDataSliceFactor(users[teamcode], key)
 			return
 		}
 	}
@@ -210,9 +226,16 @@ func handleUsersConnection(ws *websocket.Conn) {
 		clients[USERS][ws] = teamcode
 		fmt.Println("user teamcode:", clients[USERS][ws])
 
-		if len(splittedMsg) < 3 {
+		if len(splittedMsg) < 2 {
 			sort.Sort(users[teamcode])
 			fmt.Println("get users data:", users[teamcode])
+			msg = createMessageFromUsers(users[teamcode])
+			data := Data{USERS, teamcode, msg}
+			broadcast <- data
+		} else if len(splittedMsg) < 3 {
+			deleteUserFromUsers(teamcode, ws)
+			sort.Sort(users[teamcode])
+			fmt.Println("deleted users data:", users[teamcode])
 			msg = createMessageFromUsers(users[teamcode])
 			data := Data{USERS, teamcode, msg}
 			broadcast <- data
