@@ -70,6 +70,7 @@ func handleCreateTeamCode(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleJoinTeamCode(w http.ResponseWriter, r *http.Request) {
+	var teamNum = 0
 	switch r.Method {
 	case http.MethodPost:
 		body := r.Body
@@ -89,8 +90,16 @@ func handleJoinTeamCode(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", fmt.Sprintf("http://%s, https://%s", r.Host, r.Host))
 		w.Header().Set("Access-Control-Allow-Methods", "POST")
 
+		for _, value := range clients[USERS] {
+			if value == teamcode {
+				teamNum++
+			}
+		}
+
+		fmt.Println("teamNum:", teamNum)
+
 		for _, value := range teamcodes {
-			if value == teamcode && len(users[value]) < 6 {
+			if value == teamcode && teamNum < 6 {
 				_, err := w.Write([]byte(teamcode))
 				if err != nil {
 					panic(err)
