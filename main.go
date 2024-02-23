@@ -90,7 +90,7 @@ func handleJoinTeamCode(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Methods", "POST")
 
 		for _, value := range teamcodes {
-			if value == teamcode {
+			if value == teamcode && len(users[value]) < 6 {
 				_, err := w.Write([]byte(teamcode))
 				if err != nil {
 					panic(err)
