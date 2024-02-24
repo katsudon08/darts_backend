@@ -23,6 +23,16 @@ func initClients() {
 	clients[USERS] = make(map[*websocket.Conn]string)
 }
 
+func getTeamNum(teamcode string) (teamNum int) {
+	teamNum = 0
+	for _, value := range clients[USERS] {
+		if value == teamcode {
+			teamNum++
+		}
+	}
+	return
+}
+
 func handleHello(w http.ResponseWriter, r *http.Request) {
 	hello := []byte("hello world")
 	_, err := w.Write(hello)
@@ -70,7 +80,6 @@ func handleCreateTeamCode(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleJoinTeamCode(w http.ResponseWriter, r *http.Request) {
-	var teamNum = 0
 	switch r.Method {
 	case http.MethodPost:
 		body := r.Body
@@ -90,13 +99,7 @@ func handleJoinTeamCode(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", fmt.Sprintf("http://%s, https://%s", r.Host, r.Host))
 		w.Header().Set("Access-Control-Allow-Methods", "POST")
 
-		for _, value := range clients[USERS] {
-			if value == teamcode {
-				teamNum++
-			}
-		}
-
-		fmt.Println("teamNum:", teamNum)
+		teamNum := getTeamNum(teamcode)
 
 		for _, value := range teamcodes {
 			if value == teamcode && teamNum < 6 {
@@ -152,10 +155,14 @@ func deleteUserFromUsers(teamcode string, ws *websocket.Conn) {
 	}
 }
 
-func createMessageFromUsers(users []UserData) (msg string) {
+func createMessageFromUsers(users UsersData) (msg string) {
 	msg = ""
-	for _, user := range users {
-		msg += fmt.Sprintf("%s%s%s ", user.GroupNum, MARK, user.UserName)
+	for i, user := range users {
+		if i < users.Len()-1 {
+			msg += fmt.Sprintf("%s%s%s ", user.GroupNum, MARK, user.UserName)
+		} else {
+			msg += fmt.Sprintf("%s%s%s", user.GroupNum, MARK, user.UserName)
+		}
 	}
 	return
 }
@@ -234,6 +241,14 @@ func handleUsersConnection(ws *websocket.Conn) {
 
 		clients[USERS][ws] = teamcode
 		fmt.Println("user teamcode:", clients[USERS][ws])
+
+		teamNum := getTeamNum(teamcode)
+
+		if teamNum > 6 {
+			data := Data{USERS, teamcode, " "}
+			broadcast <- data
+			continue
+		}
 
 		if len(splittedMsg) < 2 {
 			sort.Sort(users[teamcode])
