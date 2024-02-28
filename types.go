@@ -39,11 +39,12 @@ type teamcodeJSON struct {
 }
 
 const (
-	NUMBER_OF_TEAM = 6
 	TURN = "turn"
+	USERS = "users"
+	GAME = "game"
+	NUMBER_OF_TEAM = 6
 	TEAM_CODE = "team-code"
 	CREATE = "create"
 	JOIN = "join"
-	USERS = "users"
 	MARK = "[:::]"
 )

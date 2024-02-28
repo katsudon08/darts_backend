@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"sort"
 	"strings"
+
 	"golang.org/x/net/websocket"
 )
 
@@ -189,8 +190,9 @@ func handleTurnConnection(ws *websocket.Conn) {
 			panic(err)
 		}
 
-		fmt.Println(msg)
+		fmt.Println("msg:", msg)
 		splittedMsg := strings.Split(msg, MARK)
+		fmt.Println(splittedMsg)
 
 		teamcode := splittedMsg[0]
 		fmt.Println("teamcode:", teamcode)
@@ -219,7 +221,7 @@ func handleUsersConnection(ws *websocket.Conn) {
 
 	clients[USERS][ws] = ""
 
-	fmt.Println("users_clients", clients[USERS])
+	fmt.Println("users_clients:", clients[USERS])
 
 	for {
 		msg := ""
@@ -232,7 +234,7 @@ func handleUsersConnection(ws *websocket.Conn) {
 			panic(err)
 		}
 
-		fmt.Println(msg)
+		fmt.Println("msg:", msg)
 		splittedMsg := strings.Split(msg, MARK)
 		fmt.Println(splittedMsg)
 
@@ -291,6 +293,30 @@ func handleUsersConnection(ws *websocket.Conn) {
 	}
 }
 
+// ゲームのコネクション
+
+func handleGameConnection(ws * websocket.Conn) {
+	defer ws.Close()
+
+	clients[GAME][ws] = ""
+
+	fmt.Println("game_clients:", clients[GAME])
+
+	for {
+		msg := ""
+		err := websocket.Message.Receive(ws, &msg)
+		if err != nil {
+			if err.Error() == "EOF" {
+				go deleteTeamCodeFromClientsDiff(GAME, ws)
+				return
+			}
+			panic(err)
+		}
+
+		fmt.Println("msg:", msg)
+	}
+}
+
 // メッセージの送信
 
 func handleMessage() {
@@ -319,6 +345,7 @@ func main() {
 	http.HandleFunc(fmt.Sprintf("/%s/%s", TEAM_CODE, JOIN), handleJoinTeamCode)
 	http.Handle(fmt.Sprintf("/%s", TURN), websocket.Handler(handleTurnConnection))
 	http.Handle(fmt.Sprintf("/%s", USERS), websocket.Handler(handleUsersConnection))
+	http.Handle(fmt.Sprintf("/%s", GAME), websocket.Handler(handleGameConnection))
 	go handleMessage()
 
 	fmt.Println("serving at http://localhost:8080....")
