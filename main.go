@@ -17,11 +17,15 @@ var users = make(map[string]UsersData)
 var teamcodes = []string{}
 var teamturn = make(map[string]string)
 var clients = make(map[string]map[*websocket.Conn]string)
+var teamcodeToGamesData = make(map[string]GamesData)
+var teamcodeToOrderNum = make(map[string]int)
 var broadcast = make(chan Data)
 
 func initClients() {
 	clients[TURN] = make(map[*websocket.Conn]string)
 	clients[USERS] = make(map[*websocket.Conn]string)
+	clients[TRANSITION] = make(map[*websocket.Conn]string)
+	clients[GAME] = make(map[*websocket.Conn]string)
 }
 
 func getTeamNum(teamcode string) (teamNum int) {
@@ -293,6 +297,33 @@ func handleUsersConnection(ws *websocket.Conn) {
 	}
 }
 
+// ゲーム画面への遷移を管理するコネクション
+
+func handleTransitionToGameScreen(ws *websocket.Conn) {
+	defer ws.Close()
+
+	clients[TRANSITION][ws] = ""
+
+	fmt.Println("transition_clients:", clients[GAME])
+
+	for {
+		teamcode := ""
+		err := websocket.Message.Receive(ws, &teamcode)
+		if err != nil {
+			if err.Error() == "EOF" {
+				go deleteTeamCodeFromClientsDiff(TRANSITION, ws)
+				return
+			}
+		}
+
+		fmt.Println("teamcode:", teamcode)
+		clients[TRANSITION][ws] = teamcode
+
+		data := Data{TRANSITION, teamcode, ""}
+		broadcast <- data
+	}
+}
+
 // ゲームのコネクション
 
 func handleGameConnection(ws * websocket.Conn) {
@@ -314,6 +345,31 @@ func handleGameConnection(ws * websocket.Conn) {
 		}
 
 		fmt.Println("msg:", msg)
+		splittedMsg := strings.Split(msg, MARK)
+		fmt.Println(splittedMsg)
+
+		teamcode, groupNum, userName, userId := splittedMsg[0], splittedMsg[1], splittedMsg[2], splittedMsg[3]
+		fmt.Println("teamcode:", teamcode)
+
+		clients[GAME][ws] = teamcode
+		fmt.Println("game teamcode:", clients[GAME][ws])
+
+		gameData := GameData{teamcode, groupNum, userName, userId}
+
+		if len(splittedMsg) < 5 {
+			teamcodeToGamesData[teamcode] =  append(teamcodeToGamesData[teamcode], gameData)
+			fmt.Printf("games_data[%s]:%v",teamcode, teamcodeToGamesData[teamcode])
+
+			teamcodeToOrderNum[teamcode] = 0
+			sort.Sort(teamcodeToGamesData[teamcode])
+
+			// TODO: 一番最初のプレーヤーに操作権を与える
+		} else {
+			score := splittedMsg[4]
+			fmt.Println(score)
+
+			// TODO: 操作権を次のプレイヤーに移し、どのチームに何点加算するのかを送信
+		}
 	}
 }
 
@@ -345,6 +401,7 @@ func main() {
 	http.HandleFunc(fmt.Sprintf("/%s/%s", TEAM_CODE, JOIN), handleJoinTeamCode)
 	http.Handle(fmt.Sprintf("/%s", TURN), websocket.Handler(handleTurnConnection))
 	http.Handle(fmt.Sprintf("/%s", USERS), websocket.Handler(handleUsersConnection))
+	http.Handle(fmt.Sprintf("/%s", TRANSITION), websocket.Handler(handleTransitionToGameScreen))
 	http.Handle(fmt.Sprintf("/%s", GAME), websocket.Handler(handleGameConnection))
 	go handleMessage()
 

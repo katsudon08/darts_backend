@@ -34,6 +34,29 @@ func (u UsersData) Less(i, j int) bool {
 	return u[i].GroupNum < u[j].GroupNum
 }
 
+type GameData struct {
+	Teamcode string
+	GroupNum string
+	UserName string
+	UserId string
+}
+
+type GamesData []GameData
+
+// 以下はソートを行うために満たす必要があるメソッド群
+
+func (g GamesData) Len() int {
+	return len(g)
+}
+
+func (g GamesData) Swap(i, j int) {
+	g[i], g[j] = g[j], g[i]
+}
+
+func (g GamesData) Less(i, j int) bool {
+	return g[i].GroupNum < g[j].GroupNum
+}
+
 type teamcodeJSON struct {
 	Teamcode string `json:"teamcode"`
 }
@@ -41,6 +64,7 @@ type teamcodeJSON struct {
 const (
 	TURN = "turn"
 	USERS = "users"
+	TRANSITION = "transition"
 	GAME = "game"
 	NUMBER_OF_TEAM = 6
 	TEAM_CODE = "team-code"
