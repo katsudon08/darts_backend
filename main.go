@@ -324,6 +324,14 @@ func handleTransitionToGameScreen(ws *websocket.Conn) {
 	}
 }
 
+func createMessageFromGameData(gameData GameData, score string, isLast bool) (msg string) {
+	msg = gameData.GroupNum + MARK + gameData.UserId + MARK + score + MARK
+	if isLast {
+		msg += "isLast"
+	}
+	return
+}
+
 // ゲームのコネクション
 
 func handleGameConnection(ws * websocket.Conn) {
@@ -364,11 +372,28 @@ func handleGameConnection(ws * websocket.Conn) {
 			sort.Sort(teamcodeToGamesData[teamcode])
 
 			// TODO: 一番最初のプレーヤーに操作権を与える
+			fmt.Println(teamcodeToGamesData[teamcode][0].UserId)
+
+			msg := teamcodeToGamesData[teamcode][0].UserId
+			data := Data{GAME, gameData.Teamcode, msg}
+
+			broadcast <- data
 		} else {
 			score := splittedMsg[4]
 			fmt.Println(score)
 
 			// TODO: 操作権を次のプレイヤーに移し、どのチームに何点加算するのかを送信
+
+			lastIndex := len(teamcodeToGamesData[teamcode]) - 1
+			fmt.Println("lastIndex:", lastIndex)
+			fmt.Println(teamcodeToGamesData[teamcode][lastIndex].UserId)
+			isLast := gameData.UserId == teamcodeToGamesData[teamcode][lastIndex].UserId
+			fmt.Println(isLast)
+
+			// groupNum userId score isLast
+			msg := createMessageFromGameData(gameData, score, isLast)
+			data := Data{GAME, gameData.Teamcode, msg}
+			broadcast <- data
 		}
 	}
 }
