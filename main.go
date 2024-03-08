@@ -324,8 +324,8 @@ func handleTransitionToGameScreen(ws *websocket.Conn) {
 	}
 }
 
-func createMessageFromGameData(gameData GameData, score string, isLast bool) (msg string) {
-	msg = gameData.GroupNum + MARK + gameData.UserId + MARK + score + MARK
+func createMessageFromGameData(gameData GameData, nextUserId string, score string, isLast bool) (msg string) {
+	msg = gameData.GroupNum + MARK + gameData.UserId + MARK + nextUserId + score + MARK
 	if isLast {
 		msg += "isLast"
 	}
@@ -390,8 +390,19 @@ func handleGameConnection(ws * websocket.Conn) {
 			isLast := gameData.UserId == teamcodeToGamesData[teamcode][lastIndex].UserId
 			fmt.Println(isLast)
 
-			// groupNum userId score isLast
-			msg := createMessageFromGameData(gameData, score, isLast)
+			teamcodeToOrderNum[teamcode]++
+			nextIndex := teamcodeToOrderNum[teamcode]
+			var nextGameData GameData
+			if nextIndex <= lastIndex {
+				nextGameData = teamcodeToGamesData[teamcode][nextIndex]
+			} else {
+				teamcodeToOrderNum[teamcode] = 0
+				nextGameData = teamcodeToGamesData[teamcode][teamcodeToOrderNum[teamcode]]
+			}
+
+
+			// groupNum userId nextUserId score isLast
+			msg := createMessageFromGameData(gameData, nextGameData.UserId, score, isLast)
 			data := Data{GAME, gameData.Teamcode, msg}
 			broadcast <- data
 		}
