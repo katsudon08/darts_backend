@@ -66,6 +66,7 @@ const (
 	USERS = "users"
 	TRANSITION = "transition"
 	GAME = "game"
+	GAME_DISPLAY = "game-display"
 	NUMBER_OF_TEAM = 6
 	TEAM_CODE = "team-code"
 	CREATE = "create"

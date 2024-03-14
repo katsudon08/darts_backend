@@ -26,6 +26,7 @@ func initClients() {
 	clients[USERS] = make(map[*websocket.Conn]string)
 	clients[TRANSITION] = make(map[*websocket.Conn]string)
 	clients[GAME] = make(map[*websocket.Conn]string)
+	clients[GAME_DISPLAY] = make(map[*websocket.Conn]string)
 }
 
 func getTeamNum(teamcode string) (teamNum int) {
@@ -172,6 +173,21 @@ func createMessageFromUsers(users UsersData) (msg string) {
 	return
 }
 
+func ReceiveWebsocketMessage(ws *websocket.Conn, key string) (msg string) {
+	msg = ""
+	err := websocket.Message.Receive(ws, &msg)
+		if err != nil {
+			if err.Error() == "EOF" {
+				go deleteTeamCodeFromClientsDiff(key, ws)
+				return
+			}
+			panic(err)
+		}
+
+		fmt.Println("msg:", msg)
+		return
+}
+
 // ターンのコネクション
 
 func handleTurnConnection(ws *websocket.Conn) {
@@ -182,19 +198,7 @@ func handleTurnConnection(ws *websocket.Conn) {
 	fmt.Println("turn_clients:", clients[TURN])
 
 	for {
-		msg := ""
-
-		err := websocket.Message.Receive(ws, &msg)
-		if err != nil {
-			// 通信切断時
-			if err.Error() == "EOF" {
-				go deleteTeamCodeFromClientsDiff(TURN, ws)
-				return
-			}
-			panic(err)
-		}
-
-		fmt.Println("msg:", msg)
+		msg := ReceiveWebsocketMessage(ws, TURN)
 		splittedMsg := strings.Split(msg, MARK)
 		fmt.Println(splittedMsg)
 
@@ -228,17 +232,7 @@ func handleUsersConnection(ws *websocket.Conn) {
 	fmt.Println("users_clients:", clients[USERS])
 
 	for {
-		msg := ""
-		err := websocket.Message.Receive(ws, &msg)
-		if err != nil {
-			if err.Error() == "EOF" {
-				go deleteTeamCodeFromClientsDiff(USERS, ws)
-				return
-			}
-			panic(err)
-		}
-
-		fmt.Println("msg:", msg)
+		msg := ReceiveWebsocketMessage(ws, USERS)
 		splittedMsg := strings.Split(msg, MARK)
 		fmt.Println(splittedMsg)
 
@@ -299,7 +293,7 @@ func handleUsersConnection(ws *websocket.Conn) {
 
 // ゲーム画面への遷移を管理するコネクション
 
-func handleTransitionToGameScreen(ws *websocket.Conn) {
+func handleTransitionToGameScreenConnection(ws *websocket.Conn) {
 	defer ws.Close()
 
 	clients[TRANSITION][ws] = ""
@@ -307,16 +301,7 @@ func handleTransitionToGameScreen(ws *websocket.Conn) {
 	fmt.Println("transition_clients:", clients[GAME])
 
 	for {
-		teamcode := ""
-		err := websocket.Message.Receive(ws, &teamcode)
-		if err != nil {
-			if err.Error() == "EOF" {
-				go deleteTeamCodeFromClientsDiff(TRANSITION, ws)
-				return
-			}
-		}
-
-		fmt.Println("teamcode:", teamcode)
+		teamcode := ReceiveWebsocketMessage(ws, TRANSITION)
 		clients[TRANSITION][ws] = teamcode
 
 		data := Data{TRANSITION, teamcode, ""}
@@ -342,17 +327,7 @@ func handleGameConnection(ws * websocket.Conn) {
 	fmt.Println("game_clients:", clients[GAME])
 
 	for {
-		msg := ""
-		err := websocket.Message.Receive(ws, &msg)
-		if err != nil {
-			if err.Error() == "EOF" {
-				go deleteTeamCodeFromClientsDiff(GAME, ws)
-				return
-			}
-			panic(err)
-		}
-
-		fmt.Println("msg:", msg)
+		msg := ReceiveWebsocketMessage(ws, GAME)
 		splittedMsg := strings.Split(msg, MARK)
 		fmt.Println(splittedMsg)
 
@@ -409,6 +384,21 @@ func handleGameConnection(ws * websocket.Conn) {
 	}
 }
 
+// ゲーム画面の表示を管理するコネクション
+
+func handleGameDisplayConnection(ws *websocket.Conn) {
+	defer ws.Close()
+
+	clients[GAME_DISPLAY][ws] = ""
+
+	fmt.Println("turn_clients:", clients[GAME_DISPLAY])
+
+	for {
+		msg := ReceiveWebsocketMessage(ws, GAME_DISPLAY)
+		fmt.Println(msg)
+	}
+}
+
 // メッセージの送信
 
 func handleMessage() {
@@ -437,8 +427,9 @@ func main() {
 	http.HandleFunc(fmt.Sprintf("/%s/%s", TEAM_CODE, JOIN), handleJoinTeamCode)
 	http.Handle(fmt.Sprintf("/%s", TURN), websocket.Handler(handleTurnConnection))
 	http.Handle(fmt.Sprintf("/%s", USERS), websocket.Handler(handleUsersConnection))
-	http.Handle(fmt.Sprintf("/%s", TRANSITION), websocket.Handler(handleTransitionToGameScreen))
+	http.Handle(fmt.Sprintf("/%s", TRANSITION), websocket.Handler(handleTransitionToGameScreenConnection))
 	http.Handle(fmt.Sprintf("/%s", GAME), websocket.Handler(handleGameConnection))
+	http.Handle(fmt.Sprintf("/%s", GAME_DISPLAY), websocket.Handler(handleGameDisplayConnection))
 	go handleMessage()
 
 	fmt.Println("serving at http://localhost:8080....")
