@@ -72,4 +72,5 @@ const (
 	CREATE = "create"
 	JOIN = "join"
 	MARK = "[:::]"
+	CANCEL = "__|__"
 )

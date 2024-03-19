@@ -179,7 +179,7 @@ func ReceiveWebsocketMessage(ws *websocket.Conn, key string) (msg string) {
 		if err != nil {
 			if err.Error() == "EOF" {
 				go deleteTeamCodeFromClientsDiff(key, ws)
-				return
+				return CANCEL
 			}
 			panic(err)
 		}
@@ -199,6 +199,9 @@ func handleTurnConnection(ws *websocket.Conn) {
 
 	for {
 		msg := ReceiveWebsocketMessage(ws, TURN)
+		if msg == CANCEL {
+			return
+		}
 		splittedMsg := strings.Split(msg, MARK)
 		fmt.Println(splittedMsg)
 
@@ -233,6 +236,9 @@ func handleUsersConnection(ws *websocket.Conn) {
 
 	for {
 		msg := ReceiveWebsocketMessage(ws, USERS)
+		if msg == CANCEL {
+			return
+		}
 		splittedMsg := strings.Split(msg, MARK)
 		fmt.Println(splittedMsg)
 
@@ -298,10 +304,13 @@ func handleTransitionToGameScreenConnection(ws *websocket.Conn) {
 
 	clients[TRANSITION][ws] = ""
 
-	fmt.Println("transition_clients:", clients[GAME])
+	fmt.Println("transition_clients:", clients[TRANSITION])
 
 	for {
 		teamcode := ReceiveWebsocketMessage(ws, TRANSITION)
+		if teamcode == CANCEL {
+			return
+		}
 		clients[TRANSITION][ws] = teamcode
 
 		data := Data{TRANSITION, teamcode, ""}
@@ -328,6 +337,9 @@ func handleGameConnection(ws * websocket.Conn) {
 
 	for {
 		msg := ReceiveWebsocketMessage(ws, GAME)
+		if msg == CANCEL {
+			return
+		}
 		splittedMsg := strings.Split(msg, MARK)
 		fmt.Println(splittedMsg)
 
@@ -395,6 +407,9 @@ func handleGameDisplayConnection(ws *websocket.Conn) {
 
 	for {
 		msg := ReceiveWebsocketMessage(ws, GAME_DISPLAY)
+		if msg == CANCEL {
+			return
+		}
 		fmt.Println(msg)
 	}
 }
