@@ -319,7 +319,7 @@ func handleTransitionToGameScreenConnection(ws *websocket.Conn) {
 }
 
 func createMessageFromGameData(gameData GameData, nextUserId string, score string, isLast bool) (msg string) {
-	msg = gameData.GroupNum + MARK + gameData.UserId + MARK + nextUserId + score + MARK
+	msg = gameData.GroupNum + MARK + gameData.UserId + MARK + nextUserId + MARK + score + MARK
 	if isLast {
 		msg += "isLast"
 	}
@@ -367,7 +367,7 @@ func handleGameConnection(ws * websocket.Conn) {
 			broadcast <- data
 		} else {
 			score := splittedMsg[4]
-			fmt.Println(score)
+			fmt.Println("score:", score)
 
 			// TODO: 操作権を次のプレイヤーに移し、どのチームに何点加算するのかを送信
 
@@ -380,7 +380,7 @@ func handleGameConnection(ws * websocket.Conn) {
 			teamcodeToOrderNum[teamcode]++
 			nextIndex := teamcodeToOrderNum[teamcode]
 			var nextGameData GameData
-			if nextIndex <= lastIndex {
+			if nextIndex < lastIndex {
 				nextGameData = teamcodeToGamesData[teamcode][nextIndex]
 			} else {
 				teamcodeToOrderNum[teamcode] = 0
@@ -390,6 +390,7 @@ func handleGameConnection(ws * websocket.Conn) {
 
 			// groupNum userId nextUserId score isLast
 			msg := createMessageFromGameData(gameData, nextGameData.UserId, score, isLast)
+			fmt.Println("msg:", msg)
 			data := Data{GAME, gameData.Teamcode, msg}
 			broadcast <- data
 		}
