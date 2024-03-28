@@ -412,6 +412,14 @@ func handleGameDisplayConnection(ws *websocket.Conn) {
 			return
 		}
 		fmt.Println(msg)
+		splittedMsg := strings.Split(msg, MARK)
+
+		teamcode := splittedMsg[0]
+		fmt.Println("teamcode:", teamcode)
+		clients[GAME_DISPLAY][ws] = teamcode
+
+		data := Data{GAME_DISPLAY, teamcode, msg}
+		broadcast <- data
 	}
 }
 
