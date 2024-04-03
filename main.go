@@ -488,7 +488,5 @@ func main() {
 	go handleMessage()
 
 	fmt.Println("serving at http://localhost:8080....")
-	go func() {
-		log.Fatal(http.ListenAndServe(":8080", nil))
-	}()
+	log.Fatal(http.ListenAndServe(":8080", nil))
 }
