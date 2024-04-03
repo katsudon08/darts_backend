@@ -27,6 +27,7 @@ func initClients() {
 	clients[TRANSITION] = make(map[*websocket.Conn]string)
 	clients[GAME] = make(map[*websocket.Conn]string)
 	clients[GAME_DISPLAY] = make(map[*websocket.Conn]string)
+	clients[RESULT] = make(map[*websocket.Conn]string)
 }
 
 func getTeamNum(teamcode string) (teamNum int) {
@@ -423,6 +424,35 @@ func handleGameDisplayConnection(ws *websocket.Conn) {
 	}
 }
 
+// リザルト画面を管理するコネクション
+
+func handleResultConnection(ws *websocket.Conn) {
+	defer ws.Close()
+
+	clients[RESULT][ws] = ""
+
+	fmt.Println("turn_clients:", clients[RESULT])
+
+	for {
+		msg := ReceiveWebsocketMessage(ws, RESULT)
+		if msg == CANCEL {
+			return
+		}
+		fmt.Println(msg)
+		splittedMsg := strings.Split(msg, MARK)
+
+		teamcode, groupNum, score := splittedMsg[0], splittedMsg[1], splittedMsg[2]
+		fmt.Println("teamcode:", teamcode)
+
+		clients[RESULT][ws] = teamcode
+
+		msg = groupNum + MARK + score
+
+		data := Data{RESULT, teamcode, msg}
+		broadcast <- data
+	}
+}
+
 // メッセージの送信
 
 func handleMessage() {
@@ -454,6 +484,7 @@ func main() {
 	http.Handle(fmt.Sprintf("/%s", TRANSITION), websocket.Handler(handleTransitionToGameScreenConnection))
 	http.Handle(fmt.Sprintf("/%s", GAME), websocket.Handler(handleGameConnection))
 	http.Handle(fmt.Sprintf("/%s", GAME_DISPLAY), websocket.Handler(handleGameDisplayConnection))
+	http.Handle(fmt.Sprintf("/%s", RESULT), websocket.Handler(handleResultConnection))
 	go handleMessage()
 
 	fmt.Println("serving at http://localhost:8080....")
