@@ -92,11 +92,15 @@ func handleJoinTeamCode(w http.ResponseWriter, r *http.Request) {
 		body := r.Body
 		defer body.Close()
 
+		fmt.Println("access request")
+
 		buf := new(bytes.Buffer)
 		io.Copy(buf, body)
 
 		var data teamcodeJSON
 		json.Unmarshal(buf.Bytes(), &data)
+
+		fmt.Println("data:", data)
 
 		teamcode := data.Teamcode
 		fmt.Println("teamcode_join:", teamcode)
@@ -108,12 +112,23 @@ func handleJoinTeamCode(w http.ResponseWriter, r *http.Request) {
 
 		teamNum := getTeamNum(teamcode)
 
+		flag := true
+
 		for _, value := range teamcodes {
 			if value == teamcode && teamNum < 6 {
 				_, err := w.Write([]byte(teamcode))
+				fmt.Println("success")
 				if err != nil {
 					panic(err)
 				}
+				flag = false
+			}
+		}
+
+		if flag {
+			_, err := w.Write([]byte(""))
+			if err != nil {
+				panic(err)
 			}
 		}
 	}
@@ -308,14 +323,25 @@ func handleTransitionToGameScreenConnection(ws *websocket.Conn) {
 	fmt.Println("transition_clients:", clients[TRANSITION])
 
 	for {
-		teamcode := ReceiveWebsocketMessage(ws, TRANSITION)
-		if teamcode == CANCEL {
+		fmt.Println("-------------transition-----------------")
+		msg := ReceiveWebsocketMessage(ws, TRANSITION)
+		if msg == CANCEL {
 			return
 		}
+		splittedMsg := strings.Split(msg, " ")
+		teamcode := splittedMsg[0]
+
+		fmt.Println("transition_teamcode:", teamcode)
 		clients[TRANSITION][ws] = teamcode
 
-		data := Data{TRANSITION, teamcode, ""}
-		broadcast <- data
+		fmt.Println(clients[TRANSITION])
+
+		fmt.Println("-------------transition-----------------")
+
+		if len(splittedMsg) < 2 {
+			data := Data{TRANSITION, teamcode, ""}
+			broadcast <- data
+		}
 	}
 }
 
