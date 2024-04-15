@@ -282,7 +282,9 @@ func handleUsersConnection(ws *websocket.Conn) {
 			deleteUserFromUsers(teamcode, ws)
 			sort.Sort(users[teamcode])
 			fmt.Println("deleted users data:", users[teamcode])
+			fmt.Printf("\n")
 			msg = createMessageFromUsers(users[teamcode])
+			fmt.Println("msg:", msg)
 			data := Data{USERS, teamcode, msg}
 			broadcast <- data
 		} else {
@@ -368,7 +370,7 @@ func handleGameConnection(ws * websocket.Conn) {
 			return
 		}
 		splittedMsg := strings.Split(msg, MARK)
-		fmt.Println(splittedMsg)
+		fmt.Println("message:", splittedMsg)
 
 		teamcode, groupNum, userName, userId := splittedMsg[0], splittedMsg[1], splittedMsg[2], splittedMsg[3]
 		fmt.Println("teamcode:", teamcode)
@@ -376,13 +378,15 @@ func handleGameConnection(ws * websocket.Conn) {
 		clients[GAME][ws] = teamcode
 		fmt.Println("game teamcode:", clients[GAME][ws])
 
+		fmt.Println("teamcodeToGameData:", teamcodeToGamesData[teamcode])
+
 		gameData := GameData{teamcode, groupNum, userName, userId}
 
 		if len(splittedMsg) < 5 {
 			teamcodeToGamesData[teamcode] =  append(teamcodeToGamesData[teamcode], gameData)
-			fmt.Printf("games_data[%s]:%v",teamcode, teamcodeToGamesData[teamcode])
+			fmt.Printf("games_data[%s]:%v\n",teamcode, teamcodeToGamesData[teamcode])
 
-			teamcodeToOrderNum[teamcode] = 0
+			teamcodeToOrderNum[teamcode] = -1
 			sort.Sort(teamcodeToGamesData[teamcode])
 
 			// TODO: 一番最初のプレーヤーに操作権を与える
@@ -406,12 +410,15 @@ func handleGameConnection(ws * websocket.Conn) {
 
 			teamcodeToOrderNum[teamcode]++
 			nextIndex := teamcodeToOrderNum[teamcode]
+			fmt.Println("lastIndex:", lastIndex)
+			fmt.Println("nextIndex:", nextIndex)
+
 			var nextGameData GameData
 			if nextIndex < lastIndex {
 				nextGameData = teamcodeToGamesData[teamcode][nextIndex]
 			} else {
-				teamcodeToOrderNum[teamcode] = 0
 				nextGameData = teamcodeToGamesData[teamcode][teamcodeToOrderNum[teamcode]]
+				teamcodeToOrderNum[teamcode] = -1
 			}
 
 
@@ -469,6 +476,7 @@ func handleResultConnection(ws *websocket.Conn) {
 
 		teamcode, groupNum, score := splittedMsg[0], splittedMsg[1], splittedMsg[2]
 		fmt.Println("teamcode:", teamcode)
+		teamcodeToGamesData[teamcode] = nil
 
 		clients[RESULT][ws] = teamcode
 
