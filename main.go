@@ -386,7 +386,7 @@ func handleGameConnection(ws * websocket.Conn) {
 			teamcodeToGamesData[teamcode] =  append(teamcodeToGamesData[teamcode], gameData)
 			fmt.Printf("games_data[%s]:%v\n",teamcode, teamcodeToGamesData[teamcode])
 
-			teamcodeToOrderNum[teamcode] = -1
+			teamcodeToOrderNum[teamcode] = 0
 			sort.Sort(teamcodeToGamesData[teamcode])
 
 			// TODO: 一番最初のプレーヤーに操作権を与える
@@ -408,17 +408,23 @@ func handleGameConnection(ws * websocket.Conn) {
 			isLast := gameData.UserId == teamcodeToGamesData[teamcode][lastIndex].UserId
 			fmt.Println(isLast)
 
-			teamcodeToOrderNum[teamcode]++
-			nextIndex := teamcodeToOrderNum[teamcode]
+			fmt.Println("games data:", teamcodeToGamesData[teamcode])
+
+			nextIndex := teamcodeToOrderNum[teamcode] + 1
 			fmt.Println("lastIndex:", lastIndex)
 			fmt.Println("nextIndex:", nextIndex)
 
 			var nextGameData GameData
-			if nextIndex < lastIndex {
-				nextGameData = teamcodeToGamesData[teamcode][nextIndex]
+			if (isLast) {
+				nextGameData = teamcodeToGamesData[teamcode][0]
+				fmt.Printf("debag 1\n\n")
+				fmt.Println("next game data:", nextGameData)
+				teamcodeToOrderNum[teamcode] = 0
 			} else {
-				nextGameData = teamcodeToGamesData[teamcode][teamcodeToOrderNum[teamcode]]
-				teamcodeToOrderNum[teamcode] = -1
+				nextGameData = teamcodeToGamesData[teamcode][nextIndex]
+				fmt.Printf("debag 2\n\n")
+				fmt.Println("next game data:", nextGameData)
+				teamcodeToOrderNum[teamcode]++
 			}
 
 
@@ -429,6 +435,11 @@ func handleGameConnection(ws * websocket.Conn) {
 			broadcast <- data
 		}
 	}
+}
+
+func createMessageFromDisplayMessage(userGroup string, userName string, score string) (msg string) {
+	msg = userGroup + MARK + userName + MARK + score
+	return
 }
 
 // ゲーム画面の表示を管理するコネクション
@@ -448,12 +459,20 @@ func handleGameDisplayConnection(ws *websocket.Conn) {
 		fmt.Println(msg)
 		splittedMsg := strings.Split(msg, MARK)
 
-		teamcode := splittedMsg[0]
+		teamcode, groupNum, userName, score := splittedMsg[0], splittedMsg[1], splittedMsg[2], splittedMsg[3]
 		fmt.Println("teamcode:", teamcode)
 		clients[GAME_DISPLAY][ws] = teamcode
 
-		data := Data{GAME_DISPLAY, teamcode, msg}
-		broadcast <- data
+		if len(splittedMsg) < 5 {
+			msg = createMessageFromDisplayMessage(groupNum, userName, score)
+			data := Data{GAME_DISPLAY, teamcode, msg}
+			broadcast <- data
+		} else {
+			firstGameData := teamcodeToGamesData[teamcode][0]
+			msg = createMessageFromDisplayMessage(firstGameData.GroupNum, firstGameData.UserName, score)
+			data := Data{GAME_DISPLAY, teamcode, msg}
+			broadcast <- data
+		}
 	}
 }
 
