@@ -28,6 +28,7 @@ func initClients() {
 	clients[GAME] = make(map[*websocket.Conn]string)
 	clients[GAME_DISPLAY] = make(map[*websocket.Conn]string)
 	clients[RESULT] = make(map[*websocket.Conn]string)
+	clients[RESULT_DISPLAY] = make(map[*websocket.Conn]string)
 }
 
 func getTeamNum(teamcode string) (teamNum int) {
@@ -449,7 +450,7 @@ func handleGameDisplayConnection(ws *websocket.Conn) {
 
 	clients[GAME_DISPLAY][ws] = ""
 
-	fmt.Println("turn_clients:", clients[GAME_DISPLAY])
+	fmt.Println("result_clients:", clients[GAME_DISPLAY])
 
 	for {
 		msg := ReceiveWebsocketMessage(ws, GAME_DISPLAY)
@@ -506,6 +507,47 @@ func handleResultConnection(ws *websocket.Conn) {
 	}
 }
 
+func separateMessage(msg string) (result string) {
+	splittedMsg := strings.Split(msg, ":")
+	if splittedMsg[1] == "" {
+		result = ""
+	} else {
+		result = msg + MARK
+	}
+	return
+}
+
+func handleResultDisplayConnection(ws *websocket.Conn) {
+	defer ws.Close()
+
+	clients[RESULT_DISPLAY][ws] = ""
+
+	fmt.Println("result-display_clients:", clients[RESULT])
+
+	for {
+		msg := ReceiveWebsocketMessage(ws, RESULT_DISPLAY)
+		if msg == CANCEL {
+			return
+		}
+		fmt.Println(msg)
+		splittedMsg := strings.Split(msg, MARK)
+		teamcode := splittedMsg[0]
+		clients[RESULT_DISPLAY][ws] = teamcode
+		fmt.Println(teamcode)
+
+		sendMessage := ""
+
+		for i:=1; i<4; i++ {
+			sendMessage += separateMessage(splittedMsg[i])
+		}
+
+		fmt.Println(sendMessage)
+
+		data := Data{RESULT_DISPLAY, teamcode, sendMessage}
+		broadcast <- data
+	}
+}
+
 // メッセージの送信
 
 func handleMessage() {
@@ -538,6 +580,7 @@ func main() {
 	http.Handle(fmt.Sprintf("/%s", GAME), websocket.Handler(handleGameConnection))
 	http.Handle(fmt.Sprintf("/%s", GAME_DISPLAY), websocket.Handler(handleGameDisplayConnection))
 	http.Handle(fmt.Sprintf("/%s", RESULT), websocket.Handler(handleResultConnection))
+	http.Handle(fmt.Sprintf("/%s", RESULT_DISPLAY), websocket.Handler(handleResultDisplayConnection))
 	go handleMessage()
 
 	fmt.Println("serving at http://localhost:8080....")

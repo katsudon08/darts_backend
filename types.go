@@ -68,6 +68,7 @@ const (
 	GAME = "game"
 	GAME_DISPLAY = "game-display"
 	RESULT = "result"
+	RESULT_DISPLAY = "result-display"
 	NUMBER_OF_TEAM = 6
 	TEAM_CODE = "team-code"
 	CREATE = "create"
